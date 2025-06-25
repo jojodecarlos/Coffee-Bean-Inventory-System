@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Manages an in-memory list of CoffeeBean objects.
  * Provides methods for CRUD operations and the custom action.
  */

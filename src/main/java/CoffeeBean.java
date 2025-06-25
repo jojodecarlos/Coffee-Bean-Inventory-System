@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
+ * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Represents a single lot of coffee beans with all required attributes.
  * Used by the DMS to store, display, and calculate values for each lot.
  */

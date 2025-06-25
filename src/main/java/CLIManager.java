@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Scanner;
 
 /**
+ * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Handles all command-line interactions with the user.
  * Displays menus, prompts for input, and calls repository methods.
  */

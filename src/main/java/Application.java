@@ -1,6 +1,7 @@
 package com.example.coffeedms;
 
 /**
+ * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Entry point for the Coffee Bean DMS CLI application.
  * Manages the overall program flow by instantiating the repository
  * and launching the menu interface.

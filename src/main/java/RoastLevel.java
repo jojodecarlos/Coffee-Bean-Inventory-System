@@ -1,6 +1,7 @@
 package com.example.coffeedms;
 
 /**
+ * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Enumeration of possible roast levels for coffee beans.
  */
 public enum RoastLevel {
