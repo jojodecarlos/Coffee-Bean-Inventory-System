@@ -14,7 +14,6 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class CoffeeDmsGUI extends JFrame {
-    // Colour palette inspired by your swatches
     private static final Color CREAM        = new Color(0xEF,0xE1,0xD5);
     private static final Color TAN          = new Color(0xE2,0xC5,0xAF);
     private static final Color MEDIUM_BROWN = new Color(0x6C,0x4A,0x37);
