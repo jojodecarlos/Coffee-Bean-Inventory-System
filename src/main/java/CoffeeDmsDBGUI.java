@@ -5,22 +5,25 @@ import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
-public class CoffeeDmsGUI extends JFrame {
+/**
+ * Swing GUI that connects to MySQL for the Coffee Bean DMS.
+ * Prompts for JDBC URL/user/password, then allows full CRUD + calculate.
+ * Styled with a coffee‑inspired palette.
+ */
+public class CoffeeDmsDBGUI extends JFrame {
+    // Coffee palette
     private static final Color CREAM        = new Color(0xEF,0xE1,0xD5);
     private static final Color TAN          = new Color(0xE2,0xC5,0xAF);
     private static final Color MEDIUM_BROWN = new Color(0x6C,0x4A,0x37);
     private static final Color DARK_BROWN   = new Color(0x43,0x2A,0x18);
     private static final Color COCOA        = new Color(0x2B,0x1A,0x0E);
 
-    private final BeanRepository repo = new BeanRepository();
+    private DBBeanRepository repo;
 
     private final DefaultTableModel tableModel = new DefaultTableModel(
             new String[]{ "Bean ID","Origin","Farm","Roast Level",
@@ -31,7 +34,7 @@ public class CoffeeDmsGUI extends JFrame {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
 
-    // Add‐lot fields
+    // Add‑lot fields
     private final JTextField addBeanID    = new JTextField(8);
     private final JTextField addOrigin    = new JTextField(8);
     private final JTextField addFarm      = new JTextField(8);
@@ -42,7 +45,7 @@ public class CoffeeDmsGUI extends JFrame {
     private final JTextField addNotes     = new JTextField(10);
     private final JTextField addCaffeine  = new JTextField(4);
 
-    // Update‐lot fields
+    // Update‑lot fields
     private final JTextField updSearchID  = new JTextField(8);
     private final JButton    btnLoad      = new JButton("Load");
     private final JTextField updBeanID    = new JTextField(8);
@@ -56,55 +59,61 @@ public class CoffeeDmsGUI extends JFrame {
     private final JTextField updCaffeine  = new JTextField(4);
     private final JButton    btnUpdate    = new JButton("Update");
 
-    // Remove‐lot field and calculate label
+    // Remove & calculate
     private final JTextField tfRemoveID   = new JTextField(8);
     private final JLabel     lblTotalValue= new JLabel("Total: $0.00");
 
-    public CoffeeDmsGUI() {
-        super("Coffee Bean DMS");
+    public CoffeeDmsDBGUI() {
+        super("Coffee Bean DMS (MySQL)");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1000, 600);
+        setSize(1000, 650);
         setLocationRelativeTo(null);
         getContentPane().setBackground(CREAM);
         setLayout(new BorderLayout());
 
-        initImportPanel();
+        initConnectionPanel();
         initTablePanel();
         initOperationsPanel();
 
         setVisible(true);
     }
 
-    /** Top panel: batch‐import button */
-    private void initImportPanel() {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    /** NORTH: Connection form */
+    private void initConnectionPanel() {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
         p.setBackground(TAN);
-        p.setBorder(new TitledBorder(null, "Import Beans from File",
+        p.setBorder(new TitledBorder(null, "MySQL Connection",
                 TitledBorder.LEFT, TitledBorder.TOP, null, DARK_BROWN));
-        JButton btn = new JButton("Choose File & Import");
+
+        JTextField tfUrl  = new JTextField("jdbc:mysql://localhost:3306/coffee_dms", 30);
+        JTextField tfUser = new JTextField(10);
+        JPasswordField pf = new JPasswordField(10);
+        JButton btn      = new JButton("Connect");
         styleButton(btn);
-        btn.addActionListener((ActionEvent e) -> {
-            JFileChooser chooser = new JFileChooser();
-            if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File f = chooser.getSelectedFile();
-                try {
-                    List<CoffeeBean> loaded = repo.loadFromFile(f.getAbsolutePath());
-                    refreshTable();
-                    String msg = loaded.isEmpty()
-                            ? "No new beans imported (duplicates/invalid)."
-                            : loaded.size() + " bean(s) imported.";
-                    JOptionPane.showMessageDialog(this, msg,
-                            "Import Complete", JOptionPane.INFORMATION_MESSAGE);
-                } catch (IOException ex) {
-                    showError("Load failed: " + ex.getMessage());
-                }
-            }
-        });
+
+        p.add(label("URL:"));      p.add(tfUrl);
+        p.add(label("User:"));     p.add(tfUser);
+        p.add(label("Password:")); p.add(pf);
         p.add(btn);
         add(p, BorderLayout.NORTH);
+
+        btn.addActionListener(e -> {
+            try {
+                repo = new DBBeanRepository(
+                        tfUrl.getText().trim(),
+                        tfUser.getText().trim(),
+                        new String(pf.getPassword())
+                );
+                refreshTable();
+                JOptionPane.showMessageDialog(this, "Connected successfully!",
+                        "Success", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                showError("Connection failed: " + ex.getMessage());
+            }
+        });
     }
 
-    /** Center: table with fixed‐width, non‐resizable/non‐reorderable columns + horizontal scroll */
+    /** CENTER: Table panel */
     private void initTablePanel() {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setBackground(CREAM);
@@ -117,23 +126,24 @@ public class CoffeeDmsGUI extends JFrame {
         header.setReorderingAllowed(false);
         header.setResizingAllowed(false);
 
-        int[] widths = {120, 80, 80, 80, 100, 60, 60, 100, 120};
+        int[] widths = {120,80,80,80,100,60,60,100,120};
         for (int i = 0; i < widths.length; i++) {
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-            table.getColumnModel().getColumn(i).setResizable(false);
+            var col = table.getColumnModel().getColumn(i);
+            col.setPreferredWidth(widths[i]);
+            col.setResizable(false);
         }
 
         JScrollPane scroll = new JScrollPane(table,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
         );
+        scroll.setBackground(CREAM);
         scroll.setBorder(new TitledBorder(null, "Bean Lots Inventory",
                 TitledBorder.LEFT, TitledBorder.TOP, null, DARK_BROWN));
-        scroll.getViewport().setBackground(CREAM);
         add(scroll, BorderLayout.CENTER);
     }
 
-    /** Bottom: scrollable tabbed operations with full‐height borders */
+    /** SOUTH: Operations tabs */
     private void initOperationsPanel() {
         JTabbedPane tabs = new JTabbedPane();
         tabs.setBackground(TAN);
@@ -158,16 +168,16 @@ public class CoffeeDmsGUI extends JFrame {
         return sp;
     }
 
-    /** Add‐lot form with full‐height titled border */
+    /** Add form */
     private JPanel createAddPanel() {
         JPanel wrapper = new JPanel();
-        wrapper.setBackground(CREAM);
         wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.Y_AXIS));
-        wrapper.setBorder(new TitledBorder(null, "Add Bean Lot",
-                TitledBorder.LEFT, TitledBorder.TOP, null, DARK_BROWN));
+        wrapper.setBackground(CREAM);
 
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row1.setBackground(CREAM);
+        row1.setBorder(new TitledBorder(null, "Add Bean Lot",
+                TitledBorder.LEFT, TitledBorder.TOP, null, DARK_BROWN));
         row1.add(label("Bean ID:"));    row1.add(addBeanID);
         row1.add(label("Origin:"));     row1.add(addOrigin);
         row1.add(label("Farm:"));       row1.add(addFarm);
@@ -176,10 +186,10 @@ public class CoffeeDmsGUI extends JFrame {
 
         JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row2.setBackground(CREAM);
-        row2.add(label("Qty (kg):"));    row2.add(addQuantity);
-        row2.add(label("Cost/kg:"));     row2.add(addCost);
-        row2.add(label("Notes:"));       row2.add(addNotes);
-        row2.add(label("Caffeine mg/g:"));row2.add(addCaffeine);
+        row2.add(label("Qty (kg):"));      row2.add(addQuantity);
+        row2.add(label("Cost/kg:"));       row2.add(addCost);
+        row2.add(label("Notes:"));         row2.add(addNotes);
+        row2.add(label("Caffeine mg/g:")); row2.add(addCaffeine);
         JButton btnAdd = new JButton("Add");
         styleButton(btnAdd);
         btnAdd.addActionListener(e -> handleAdd());
@@ -190,20 +200,20 @@ public class CoffeeDmsGUI extends JFrame {
         return wrapper;
     }
 
-    /** Update‐lot form with full‐height titled border */
+    /** Update form */
     private JPanel createUpdatePanel() {
         JPanel wrapper = new JPanel();
-        wrapper.setBackground(CREAM);
         wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.Y_AXIS));
+        wrapper.setBackground(CREAM);
         wrapper.setBorder(new TitledBorder(null, "Update Bean Lot",
                 TitledBorder.LEFT, TitledBorder.TOP, null, DARK_BROWN));
 
-        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        searchRow.setBackground(CREAM);
-        searchRow.add(label("Existing Bean ID:")); searchRow.add(updSearchID);
+        JPanel search = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        search.setBackground(CREAM);
+        search.add(label("Existing Bean ID:")); search.add(updSearchID);
         styleButton(btnLoad);
-        searchRow.add(btnLoad);
-        btnLoad.addActionListener(e -> loadForUpdate());
+        search.add(btnLoad);
+        btnLoad.addActionListener(e -> handleLoad());
 
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row1.setBackground(CREAM);
@@ -215,21 +225,21 @@ public class CoffeeDmsGUI extends JFrame {
 
         JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row2.setBackground(CREAM);
-        row2.add(label("Qty (kg):"));    row2.add(updQuantity);
-        row2.add(label("Cost/kg:"));     row2.add(updCost);
-        row2.add(label("Notes:"));       row2.add(updNotes);
-        row2.add(label("Caffeine mg/g:"));row2.add(updCaffeine);
+        row2.add(label("Qty (kg):"));      row2.add(updQuantity);
+        row2.add(label("Cost/kg:"));       row2.add(updCost);
+        row2.add(label("Notes:"));         row2.add(updNotes);
+        row2.add(label("Caffeine mg/g:")); row2.add(updCaffeine);
         styleButton(btnUpdate);
         row2.add(btnUpdate);
         btnUpdate.addActionListener(e -> handleUpdate());
 
-        wrapper.add(searchRow);
+        wrapper.add(search);
         wrapper.add(row1);
         wrapper.add(row2);
-        setUpdateFieldsEnabled(false);
         return wrapper;
     }
 
+    /** Remove form */
     private JPanel createRemovePanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
         p.setBackground(CREAM);
@@ -243,6 +253,7 @@ public class CoffeeDmsGUI extends JFrame {
         return p;
     }
 
+    /** Calculate form */
     private JPanel createCalculatePanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
         p.setBackground(CREAM);
@@ -257,34 +268,7 @@ public class CoffeeDmsGUI extends JFrame {
         return p;
     }
 
-    private void loadForUpdate() {
-        CoffeeBean b = repo.findByID(updSearchID.getText().trim());
-        if (b == null) { showError("Bean ID not found."); return; }
-        updBeanID.setText(b.getBeanID());
-        updOrigin.setText(b.getOriginCountry());
-        updFarm.setText(b.getFarmName());
-        updRoastLevel.setSelectedItem(b.getRoastLevel());
-        updRoastDate.setText(b.getRoastDate().toString());
-        updQuantity.setText(String.valueOf(b.getQuantityKg()));
-        updCost.setText(b.getCostPerKg().toString());
-        updNotes.setText(b.getFlavorNotes());
-        updCaffeine.setText(String.valueOf(b.getCaffeineContentMgPerGram()));
-        setUpdateFieldsEnabled(true);
-    }
-
-    private void setUpdateFieldsEnabled(boolean on) {
-        updBeanID.setEnabled(on);
-        updOrigin.setEnabled(on);
-        updFarm.setEnabled(on);
-        updRoastLevel.setEnabled(on);
-        updRoastDate.setEnabled(on);
-        updQuantity.setEnabled(on);
-        updCost.setEnabled(on);
-        updNotes.setEnabled(on);
-        updCaffeine.setEnabled(on);
-        btnUpdate.setEnabled(on);
-    }
-
+    // Handler methods (unchanged functionality)
     private void handleAdd() {
         try {
             CoffeeBean b = new CoffeeBean(
@@ -294,22 +278,36 @@ public class CoffeeDmsGUI extends JFrame {
                     (RoastLevel)addRoastLevel.getSelectedItem(),
                     LocalDate.parse(addRoastDate.getText().trim()),
                     Double.parseDouble(addQuantity.getText().trim()),
-                    new BigDecimal(addCost.getText().trim()),
+                    new java.math.BigDecimal(addCost.getText().trim()),
                     addNotes.getText().trim(),
                     Double.parseDouble(addCaffeine.getText().trim())
             );
-            if (!repo.add(b)) {
-                showError("Bean ID already exists!");
-                return;
-            }
+            if (!repo.add(b)) { showError("Bean ID already exists!"); return; }
             refreshTable();
-            JOptionPane.showMessageDialog(this, "Bean added.", "Success", JOptionPane.INFORMATION_MESSAGE);
         } catch (DateTimeParseException ex) {
             showError("Invalid date format.");
         } catch (NumberFormatException ex) {
-            showError("Qty, Cost, and Caffeine must be numeric.");
+            showError("Numeric fields invalid.");
         } catch (Exception ex) {
             showError("Add failed: " + ex.getMessage());
+        }
+    }
+
+    private void handleLoad() {
+        try {
+            CoffeeBean b = repo.findByID(updSearchID.getText().trim());
+            if (b == null) { showError("Bean ID not found."); return; }
+            updBeanID.setText(b.getBeanID());
+            updOrigin.setText(b.getOriginCountry());
+            updFarm.setText(b.getFarmName());
+            updRoastLevel.setSelectedItem(b.getRoastLevel());
+            updRoastDate.setText(b.getRoastDate().toString());
+            updQuantity.setText(String.valueOf(b.getQuantityKg()));
+            updCost.setText(b.getCostPerKg().toString());
+            updNotes.setText(b.getFlavorNotes());
+            updCaffeine.setText(String.valueOf(b.getCaffeineContentMgPerGram()));
+        } catch (Exception ex) {
+            showError("Load failed: " + ex.getMessage());
         }
     }
 
@@ -322,59 +320,58 @@ public class CoffeeDmsGUI extends JFrame {
                     (RoastLevel)updRoastLevel.getSelectedItem(),
                     LocalDate.parse(updRoastDate.getText().trim()),
                     Double.parseDouble(updQuantity.getText().trim()),
-                    new BigDecimal(updCost.getText().trim()),
+                    new java.math.BigDecimal(updCost.getText().trim()),
                     updNotes.getText().trim(),
                     Double.parseDouble(updCaffeine.getText().trim())
             );
-            if (!repo.update(b)) {
-                showError("Update failed (ID not found).");
-                return;
-            }
+            if (!repo.update(b)) { showError("Update failed: ID not found"); return; }
             refreshTable();
-            JOptionPane.showMessageDialog(this, "Bean updated.", "Success", JOptionPane.INFORMATION_MESSAGE);
-        } catch (DateTimeParseException ex) {
-            showError("Invalid date format.");
-        } catch (NumberFormatException ex) {
-            showError("Qty, Cost, and Caffeine must be numeric.");
         } catch (Exception ex) {
             showError("Update failed: " + ex.getMessage());
         }
     }
 
     private void handleRemove() {
-        if (!repo.removeByID(tfRemoveID.getText().trim())) {
-            showError("Remove failed (ID not found).");
-        } else {
-            refreshTable();
-            JOptionPane.showMessageDialog(this,
-                    "Bean removed.", "Success", JOptionPane.INFORMATION_MESSAGE);
+        try {
+            if (!repo.removeByID(tfRemoveID.getText().trim())) {
+                showError("Remove failed: ID not found");
+            } else {
+                refreshTable();
+            }
+        } catch (Exception ex) {
+            showError("Remove failed: " + ex.getMessage());
         }
     }
 
     private void handleCalculate() {
-        BigDecimal total = repo.calculateTotalInventoryValue();
-        lblTotalValue.setText("Total: $" + total);
+        try {
+            BigDecimal total = repo.calculateTotalInventoryValue();
+            lblTotalValue.setText("Total: $" + total);
+        } catch (Exception ex) {
+            showError("Calculation failed: " + ex.getMessage());
+        }
     }
 
     private void refreshTable() {
         tableModel.setRowCount(0);
-        for (CoffeeBean b : repo.findAll()) {
-            tableModel.addRow(new Object[]{
-                    b.getBeanID(),
-                    b.getOriginCountry(),
-                    b.getFarmName(),
-                    b.getRoastLevel(),
-                    b.getRoastDate(),
-                    b.getQuantityKg(),
-                    b.getCostPerKg(),
-                    b.getFlavorNotes(),
-                    b.getCaffeineContentMgPerGram()
-            });
+        try {
+            List<CoffeeBean> list = repo.findAll();
+            for (CoffeeBean b : list) {
+                tableModel.addRow(new Object[]{
+                        b.getBeanID(),
+                        b.getOriginCountry(),
+                        b.getFarmName(),
+                        b.getRoastLevel(),
+                        b.getRoastDate(),
+                        b.getQuantityKg(),
+                        b.getCostPerKg(),
+                        b.getFlavorNotes(),
+                        b.getCaffeineContentMgPerGram()
+                });
+            }
+        } catch (Exception ex) {
+            showError("Refresh failed: " + ex.getMessage());
         }
-    }
-
-    private void showError(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     private void styleButton(JButton b) {
@@ -389,7 +386,11 @@ public class CoffeeDmsGUI extends JFrame {
         return l;
     }
 
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(CoffeeDmsGUI::new);
+        SwingUtilities.invokeLater(CoffeeDmsDBGUI::new);
     }
 }
