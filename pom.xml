@@ -15,24 +15,17 @@
     </properties>
 
     <dependencies>
-        <!-- MySQL JDBC driver -->
+        <!-- MySQL JDBC driver (runtime) -->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <version>${mysql.connector.version}</version>
         </dependency>
 
-        <!-- JUnit 5 API -->
+        <!-- JUnit Jupiter (API + Engine) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.jupiter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- JUnit 5 Engine -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
+            <artifactId>junit-jupiter</artifactId>
             <version>${junit.jupiter.version}</version>
             <scope>test</scope>
         </dependency>
@@ -40,7 +33,7 @@
 
     <build>
         <plugins>
-            <!-- Java compiler -->
+            <!-- Compile with Java 11 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -49,6 +42,44 @@
                     <release>${java.version}</release>
                 </configuration>
             </plugin>
+
+            <!-- Package Main‑Class into the default JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.example.coffeedms.CoffeeDmsDBGUI</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <!-- Build fat JAR with dependencies -->
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.example.coffeedms.CoffeeDmsDBGUI</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals><goal>single</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Run JUnit 5 tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
