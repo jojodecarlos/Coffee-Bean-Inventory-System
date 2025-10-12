@@ -9,22 +9,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Manages an in-memory list of CoffeeBean objects.
- * Provides methods for CRUD operations and the custom action.
+ * Enforces unique beanID on both manual add and batch-load.
  */
 public class BeanRepository {
     private final List<CoffeeBean> beans = new ArrayList<>();
 
     /**
-     * loadFromFile
-     *
      * Reads a CSV file of bean records, validates each line,
-     * and adds valid beans to the repository.
+     * and adds only those with a new beanID.
      *
      * @param path filesystem path to CSV
-     * @return list of successfully loaded beans
-     * @throws IOException if file cannot be read
+     * @return list of beans actually loaded (i.e., non-duplicates)
+     * @throws IOException if the file cannot be read
      */
     public List<CoffeeBean> loadFromFile(String path) throws IOException {
         List<CoffeeBean> loaded = new ArrayList<>();
@@ -44,10 +41,14 @@ public class BeanRepository {
                             p[7].trim(),
                             Double.parseDouble(p[8].trim())
                     );
-                    beans.add(b);
-                    loaded.add(b);
+                    // Skip if ID already exists
+                    if (findByID(b.getBeanID()) == null) {
+                        beans.add(b);
+                        loaded.add(b);
+                    }
                 } catch (Exception ex) {
-                    System.err.println("Skipping invalid line: " + line);
+                    // invalid line or duplicate → skip quietly
+                    System.err.println("Skipping invalid/duplicate line: " + line);
                 }
             }
         }
@@ -55,37 +56,22 @@ public class BeanRepository {
     }
 
     /**
-     * add
+     * Adds a new bean if its beanID is unique.
      *
-     * Inserts a new CoffeeBean into the list.
-     *
-     * @param bean bean to add
-     * @return true if added successfully
+     * @param bean the CoffeeBean to add
+     * @return true if added; false if a bean with same ID already exists
      */
     public boolean add(CoffeeBean bean) {
+        if (findByID(bean.getBeanID()) != null) {
+            return false;
+        }
         return beans.add(bean);
     }
 
-    /**
-     * removeByID
-     *
-     * Deletes the bean whose ID matches the argument.
-     *
-     * @param beanID identifier of the bean to remove
-     * @return true if a bean was removed
-     */
     public boolean removeByID(String beanID) {
         return beans.removeIf(b -> b.getBeanID().equals(beanID));
     }
 
-    /**
-     * update
-     *
-     * Replaces an existing bean (by ID) with the provided object.
-     *
-     * @param updatedBean bean containing updated data
-     * @return true if the update succeeded
-     */
     public boolean update(CoffeeBean updatedBean) {
         for (int i = 0; i < beans.size(); i++) {
             if (beans.get(i).getBeanID().equals(updatedBean.getBeanID())) {
@@ -96,40 +82,19 @@ public class BeanRepository {
         return false;
     }
 
-    /**
-     * findByID
-     *
-     * Searches for a bean with the given ID.
-     *
-     * @param beanID identifier to look up
-     * @return matching CoffeeBean or null if not found
-     */
     public CoffeeBean findByID(String beanID) {
         for (CoffeeBean b : beans) {
-            if (b.getBeanID().equals(beanID)) {
-                return b;
-            }
+            if (b.getBeanID().equals(beanID)) return b;
         }
         return null;
     }
 
-    /**
-     * findAll
-     *
-     * Returns a snapshot list of all beans.
-     *
-     * @return copy of the bean list
-     */
     public List<CoffeeBean> findAll() {
         return new ArrayList<>(beans);
     }
 
     /**
-     * calculateTotalInventoryValue
-     *
      * Sums the value of each bean (quantity × cost).
-     *
-     * @return total inventory value as BigDecimal
      */
     public BigDecimal calculateTotalInventoryValue() {
         BigDecimal sum = BigDecimal.ZERO;

@@ -1,22 +1,25 @@
-package com.example.coffeedms;
-
 /**
  * Joses De Carlos, CEN3024C 31774, 06-18-2025
  * Entry point for the Coffee Bean DMS CLI application.
  * Manages the overall program flow by instantiating the repository
  * and launching the menu interface.
  */
+package com.example.coffeedms;
+
+import javax.swing.SwingUtilities;
+
+/**
+ * Entry point for the Coffee Bean DMS GUI application.
+ * Launches the CoffeeDmsGUI on the Event Dispatch Thread.
+ */
 public class Application {
     /**
      * main
      *
-     * Starts the Coffee Bean DMS by creating necessary objects
-     * and invoking the command-line interface loop.
-     *
      * @param args unused
      */
     public static void main(String[] args) {
-        BeanRepository repo = new BeanRepository();
-        new CLIManager(repo).showMenu();
+        SwingUtilities.invokeLater(CoffeeDmsGUI::new);
     }
 }
+
