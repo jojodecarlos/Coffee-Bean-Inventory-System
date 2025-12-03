@@ -70,12 +70,19 @@ $contextPath = (Get-Location).Path
 
 Write-Host "Docker build context: $contextPath"
 
-docker build -f "Dockerfile" --build-arg "JAR_FILE=$relJar" `
-    -t "$env:IMAGE_NAME:$APP_VERSION" `
-    -t "$env:IMAGE_NAME:latest" `
-    "$contextPath"
+$buildArgs = @(
+    "build"
+    "-f", "Dockerfile"
+    "--build-arg", "JAR_FILE=$relJar"
+    "-t", "$env:IMAGE_NAME:$APP_VERSION"
+    "-t", "$env:IMAGE_NAME:latest"
+    $contextPath
+)
+
+& docker @buildArgs
 
 if ($LASTEXITCODE -ne 0) { throw "Docker build failed" }
+
 
 
 
