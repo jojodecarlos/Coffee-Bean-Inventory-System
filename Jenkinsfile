@@ -1,10 +1,10 @@
 pipeline {
     agent any
 
-    tools {
-        jdk    'jdk 24'
-        maven  'Maven 3.9.11'
-    }
+//   tools {
+//        jdk    'jdk 24'
+//       maven  'Maven 3.9.11'
+//  }
 
     parameters {
         choice(
