@@ -88,7 +88,7 @@ pipeline {
                                 throw "IMAGE_NAME is not set in environment! Check Jenkinsfile environment block."
                             }
 
-                            $workspace = $env:WORKSPACE -replace "\\", "/"
+                            $workspace = $env:WORKSPACE -replace '\\', '/'
                             Write-Host "Normalized Workspace Path: $workspace"
 
                             $workspacePath = $workspace
