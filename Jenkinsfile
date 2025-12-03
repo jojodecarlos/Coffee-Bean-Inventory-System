@@ -65,8 +65,18 @@ $relJar = $relJar -replace "\\\\", "/"         # convert slashes
 
 Write-Host "Using JAR for Docker build: $relJar"
 
-docker build -f "Dockerfile" --build-arg "JAR_FILE=$relJar" -t "$env:IMAGE_NAME:$APP_VERSION" -t "$env:IMAGE_NAME:latest" .
+Set-Location -Path "$env:WORKSPACE"
+$contextPath = (Get-Location).Path
+
+Write-Host "Docker build context: $contextPath"
+
+docker build -f "Dockerfile" --build-arg "JAR_FILE=$relJar" `
+    -t "$env:IMAGE_NAME:$APP_VERSION" `
+    -t "$env:IMAGE_NAME:latest" `
+    "$contextPath"
+
 if ($LASTEXITCODE -ne 0) { throw "Docker build failed" }
+
 
 
 $env:DOCKERHUB_PSW | docker login -u "$env:DOCKERHUB_USR" --password-stdin
