@@ -36,7 +36,7 @@ pipeline {
             steps {
                 withCredentials([
                     string(
-                        credentialsId: 'dockerhub-pat',
+                        credentialsId: 'dockerhub-pat',   // Secret Text credential (your Docker Hub PAT)
                         variable: 'DOCKERHUB_TOKEN'
                     )
                 ]) {
@@ -59,10 +59,10 @@ pipeline {
                         Write-Host "Using JAR for Docker build: $jarPath"
 
                         # Docker image tags
-                        $imageName = $env:DOCKER_IMAGE_NAME
-                        $context   = (Get-Location).Path
-                        $versionTag = "$imageName:$appVersion"
-                        $latestTag  = "$imageName:latest"
+                        $imageName  = $env:DOCKER_IMAGE_NAME
+                        $context    = (Get-Location).Path
+                        $versionTag = "$($imageName):$appVersion"
+                        $latestTag  = "$($imageName):latest"
 
                         Write-Host "Docker build context: $context"
                         Write-Host "Building image tags: $versionTag and $latestTag"
