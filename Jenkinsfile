@@ -1,21 +1,21 @@
 pipeline {
     agent any
 
-//   tools {
-//        jdk    'jdk 24'
-//       maven  'Maven 3.9.11'
-//  }
+    // tools {
+    //     jdk    'jdk21'
+    //     maven  'Maven 3.9.11'
+    // }
 
     parameters {
         choice(
             name: 'ENV',
             choices: ['staging', 'production'],
-            description: 'Where to deploy this build'
+            description: 'Which environment to deploy to'
         )
         string(
             name: 'ROLLBACK_TAG',
             defaultValue: '',
-            description: 'Optional: existing image tag to deploy instead of the new build (e.g., 1.0.0)'
+            description: 'Optional: tag to deploy instead of new build (e.g., 1.0.0)'
         )
     }
 
@@ -24,6 +24,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -48,54 +49,47 @@ pipeline {
                 ]) {
                     powershell '''
 $ErrorActionPreference = "Stop"
+Write-Host "=== Docker Build, Push & Deploy Pipeline ==="
 
-Write-Host "=== Docker Build, Push & Deploy for Coffee Bean Inventory ==="
-
-$APP_VERSION = (
-  & mvn help:evaluate "-Dexpression=project.version" -q "-DforceStdout" |
-  Select-String -Pattern "^\d+(\\.\\d+)*([-\w\\.]+)?$" |
-  Select-Object -Last 1
-).ToString().Trim()
-
+$APP_VERSION = (& mvn help:evaluate "-Dexpression=project.version" -q "-DforceStdout").Trim()
 if (-not $APP_VERSION) { throw "Could not read project.version from POM" }
-Write-Host "Resolved Maven project.version = $APP_VERSION"
 
-Set-Location -Path "$env:WORKSPACE"
+Write-Host "Resolved App Version: $APP_VERSION"
 
 $jar = Get-ChildItem -Path "target" -Filter *.jar | Select-Object -First 1
 if (-not $jar) { throw "No JAR found under target/. Did Maven build succeed?" }
 
 $relJar = Resolve-Path -Relative $jar.FullName
-$relJar = $relJar -replace "^[.][\\\\/]", ""   # remove leading .\ or ./
-$relJar = $relJar -replace "\\\\","/"          # backslashes -> forward slashes
+$relJar = $relJar -replace "^[.][\\\\/]", ""   # remove leading .\\
+$relJar = $relJar -replace "\\\\", "/"         # convert slashes
 
-Write-Host "Using relative JAR path for Docker: $relJar"
-Write-Host "Building image $env:IMAGE_NAME:$APP_VERSION"
+Write-Host "Using JAR for Docker build: $relJar"
 
 docker build -f "Dockerfile" --build-arg "JAR_FILE=$relJar" `
-  -t "${env:IMAGE_NAME}:$APP_VERSION" `
-  -t "${env:IMAGE_NAME}:latest" `
+  -t "$env:IMAGE_NAME:$APP_VERSION" `
+  -t "$env:IMAGE_NAME:latest" `
   .
-if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
+if ($LASTEXITCODE -ne 0) { throw "Docker build failed" }
 
 $env:DOCKERHUB_PSW | docker login -u "$env:DOCKERHUB_USR" --password-stdin
-if ($LASTEXITCODE -ne 0) { throw "Docker login failed" }
+if ($LASTEXITCODE -ne 0) { throw "Docker Hub login failed" }
 
-docker push "${env:IMAGE_NAME}:$APP_VERSION"
-if ($LASTEXITCODE -ne 0) { throw "Push failed (${env:IMAGE_NAME}:$APP_VERSION)" }
+docker push "$env:IMAGE_NAME:$APP_VERSION"
+if ($LASTEXITCODE -ne 0) { throw "Push failed ($APP_VERSION)" }
 
-docker push "${env:IMAGE_NAME}:latest"
-if ($LASTEXITCODE -ne 0) { throw "Push failed (${env:IMAGE_NAME}:latest)" }
+docker push "$env:IMAGE_NAME:latest"
+if ($LASTEXITCODE -ne 0) { throw "Push failed (:latest)" }
 
 docker logout
-Write-Host "Pushed ${env:IMAGE_NAME}:$APP_VERSION and :latest to Docker Hub"
+Write-Host "Pushed tags $APP_VERSION and latest"
 
 if ($env:ROLLBACK_TAG -and $env:ROLLBACK_TAG.Trim() -ne "") {
     $TAG = $env:ROLLBACK_TAG.Trim()
-    Write-Host "ROLLBACK_TAG specified, deploying existing tag: $TAG"
-} else {
+    Write-Host "⚠️ Rollback mode: deploying tag $TAG"
+}
+else {
     $TAG = $APP_VERSION
-    Write-Host "Deploying newly built tag: $TAG"
+    Write-Host "Deploying newly built tag $TAG"
 }
 
 switch ($env:ENV) {
@@ -107,14 +101,12 @@ switch ($env:ENV) {
         $PORT = 8080
         $NAME = "coffee-inventory"
     }
-    default {
-        throw "ENV must be 'staging' or 'production', got '$($env:ENV)'"
-    }
+    default { throw "Invalid ENV parameter: $env:ENV" }
 }
 
-Write-Host "Target environment: $($env:ENV)"
-Write-Host "Container name:     $NAME"
-Write-Host "Host port:          $PORT"
+Write-Host "Environment: $($env:ENV)"
+Write-Host "Container name: $NAME"
+Write-Host "Port: $PORT"
 
 $DB_HOST     = "host.docker.internal"
 $DB_PORT     = "3306"
@@ -132,16 +124,18 @@ docker run -d `
   -e "SPRING_DATASOURCE_URL=$JDBC_URL" `
   -e "SPRING_DATASOURCE_USERNAME=$DB_USER" `
   -e "SPRING_DATASOURCE_PASSWORD=$DB_PASSWORD" `
-  "${env:IMAGE_NAME}:$TAG"
+  "$env:IMAGE_NAME:$TAG"
 
-if ($LASTEXITCODE -ne 0) { throw "docker run failed (${env:IMAGE_NAME}:$TAG)" }
+if ($LASTEXITCODE -ne 0) { throw "docker run failed: $env:IMAGE_NAME:$TAG" }
 
 Start-Sleep -Seconds 3
 docker ps --filter "name=$NAME"
-Write-Host "✅ Deployed ${env:IMAGE_NAME}:$TAG to $($env:ENV) at http://localhost:$PORT"
+
+Write-Host "✅ Successfully deployed $env:IMAGE_NAME:$TAG → $env:ENV at http://localhost:$PORT"
 '''
                 }
             }
         }
+
     }
 }
