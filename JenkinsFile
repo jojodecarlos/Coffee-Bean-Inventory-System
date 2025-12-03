@@ -1,10 +1,8 @@
 pipeline {
-    // Make sure this runs on your Windows node
-    agent any   // or: agent { label 'windows' }
+    agent any
 
     tools {
-        // Match the names from "Manage Jenkins → Global Tool Configuration"
-        jdk    'JDK11'
+        jdk    'jdk 24'
         maven  'Maven 3.9.11'
     }
 
@@ -28,7 +26,6 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Uses your Jenkins job SCM config
                 checkout scm
             }
         }
