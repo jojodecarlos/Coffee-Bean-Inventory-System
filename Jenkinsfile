@@ -100,8 +100,9 @@ pipeline {
                             $dbPass   = "coffee_db"
                             $dbName   = "coffee_db"
 
-                            Write-Host "Database connection string: $dbUser@$dbHost:$dbPort/$dbName"
+                            Write-Host ("Database connection string: {0}@{1}:{2}/{3}" -f $dbUser, $dbHost, $dbPort, $dbName)
 
+                            # If ROLLBACK_TAG is set, we do a pull & retag; otherwise build a new image
                             $rollbackTag = $env:ROLLBACK_TAG
                             $appVersion  = $env:APP_VERSION
                             $imageName   = $env:IMAGE_NAME
@@ -115,18 +116,19 @@ pipeline {
                                 throw "IMAGE_NAME is empty or null; cannot proceed with Docker operations."
                             }
 
-                            $versionTag = "$imageName:$appVersion"
-                            $latestTag  = "$imageName:latest"
+                            $versionTag = "${imageName}:${appVersion}"
+                            $latestTag  = "${imageName}:latest"
 
                             Write-Host "Computed version tag:  $versionTag"
                             Write-Host "Computed latest tag:   $latestTag"
 
                             Write-Host "DEBUG: Docker username = $env:DOCKERHUB_USR"
                             Write-Host "DEBUG: Docker image    = $env:IMAGE_NAME"
-                            Write-Host "DEBUG: Will push tags  = $env:IMAGE_NAME:$appVersion and $env:IMAGE_NAME:latest"
+                            Write-Host ("DEBUG: Will push tags  = {0}:{1} and {0}:latest" -f $env:IMAGE_NAME, $appVersion)
 
                             if (-not [string]::IsNullOrWhiteSpace($rollbackTag)) {
-                                $rollbackFullTag = "$imageName:$rollbackTag"
+                                # Rollback scenario: pull existing image and retag
+                                $rollbackFullTag = "${imageName}:${rollbackTag}"
                                 Write-Host "Rollback requested. Will pull and retag existing image: $rollbackFullTag"
 
                                 docker pull $rollbackFullTag
@@ -150,14 +152,14 @@ pipeline {
                             }
                             else {
                                 # Normal build scenario
-                                Write-Host "Building image $env:IMAGE_NAME:$appVersion"
+                                Write-Host "Building image ${imageName}:$appVersion"
                                 Write-Host "Using Docker build context: $workspacePath"
 
                                 docker build `
                                     -f "Dockerfile" `
                                     --build-arg "JAR_FILE=target/coffee-dms-1.0.0-jar-with-dependencies.jar" `
-                                    -t "$imageName:$appVersion" `
-                                    -t "$imageName:latest" `
+                                    -t "${imageName}:${appVersion}" `
+                                    -t "${imageName}:latest" `
                                     "$workspacePath"
 
                                 if ($LASTEXITCODE -ne 0) {
